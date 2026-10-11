@@ -41,6 +41,14 @@ SECRETS.each do |s|
 end
 abort "ERREUR : VRRP_PASSWORD doit faire 8 caractères au plus (limite keepalived)" \
   if param("VRRP_PASSWORD").length > 8
+    
+   # Piège n°5 : un script en fins de ligne Windows échoue dans la VM.
+Dir.glob(File.join(RACINE, "scripts", "*.sh")).each do |f|
+  if File.binread(f).include?("\r")
+    abort "ERREUR : #{File.basename(f)} contient des fins de ligne Windows (CRLF). " \
+          "Corrigez avec : sed -i 's/\\r$//' scripts/*.sh"
+  end
+end 
 
 # ---------------------------------------------------------------------
 # 2. Paramètres du déploiement
