@@ -5,68 +5,47 @@ set -euo pipefail
 source /vagrant/scripts/lib.sh
 
 PG_VER=16
-PG_CONF_DIR="/etc/postgresql/${PG_VER}/main"
+SERVICE="postgresql@${PG_VER}-main"
 echo "[bdd] $(hostname) — PostgreSQL ${PG_VER} (primaire)"
 
-# --- 1. Installation -----------------------------------------------------
+# --- 1. Installation et configuration -------------------------------------
 installer_paquets "postgresql-${PG_VER}"
-systemctl enable --now "postgresql@${PG_VER}-main" > /dev/null 2>&1
+systemctl enable --now "$SERVICE" > /dev/null 2>&1
 
-REDEMARRER=0
-RECHARGER=0
-
-# --- 2. Configuration (fichier dédié dans conf.d, inclus par défaut) ----
-if ecrire_si_change "${PG_CONF_DIR}/conf.d/resultats.conf" postgres:postgres 644 <<EOF
-# Géré par le provisionnement Vagrant — ne pas modifier à la main
-listen_addresses = '*'          # filtrage assuré par pg_hba.conf
-port = 5432
-max_connections = 100
-EOF
-then REDEMARRER=1; fi
-
-# --- 3. Contrôle d'accès : réseau privé uniquement, mot de passe obligatoire
-if ecrire_si_change "${PG_CONF_DIR}/pg_hba.conf" postgres:postgres 640 <<EOF
-# Géré par le provisionnement Vagrant — ne pas modifier à la main
-# TYPE  BASE       UTILISATEUR      ADRESSE              MÉTHODE
-local   all        postgres                              peer
-local   all        all                                   peer
-host    all        all              127.0.0.1/32         scram-sha-256
-host    resultats  ${PG_APP_USER}   ${RESEAU}.0/24       scram-sha-256
-EOF
-then RECHARGER=1; fi
-
-if [ "$REDEMARRER" = 1 ]; then
-  echo "   redémarrage de PostgreSQL (listen_addresses modifié)"
-  systemctl restart "postgresql@${PG_VER}-main"
-elif [ "$RECHARGER" = 1 ]; then
-  echo "   rechargement de PostgreSQL (pg_hba.conf modifié)"
-  systemctl reload "postgresql@${PG_VER}-main"
+if ecrire_config_postgresql; then
+  echo "   redémarrage de PostgreSQL (configuration modifiée)"
+  systemctl restart "$SERVICE"
 fi
+attendre_postgresql
 
-# Attendre que le serveur accepte les connexions
-for i in $(seq 1 30); do
-  pg_isready -q && break
-  sleep 1
-done
-pg_isready -q || { echo "ERREUR : PostgreSQL ne répond pas"; exit 1; }
-
-# --- 4. Rôles, base, table et données -------------------------------------
+# --- 2. Rôles et base -------------------------------------------------------
 cd /tmp   # évite l'avertissement « could not change directory » de sudo -u postgres
 
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 \
-     -v app_user="${PG_APP_USER}" -v app_pw="${PG_APP_PASSWORD}" \
-     -v su_pw="${PG_SUPERUSER_PASSWORD}" <<'SQL'
+     -v su_pw="${PG_SUPERUSER_PASSWORD}" \
+     -v app_user="${PG_APP_USER}"  -v app_pw="${PG_APP_PASSWORD}" \
+     -v repl_user="${PG_REPL_USER}" -v repl_pw="${PG_REPL_PASSWORD}" <<'SQL'
+SET client_min_messages TO warning;
 ALTER ROLE postgres WITH PASSWORD :'su_pw';
+
+-- Compte applicatif (lecture seule, droits accordés plus bas)
 SELECT format('CREATE ROLE %I LOGIN', :'app_user')
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'app_user') \gexec
 ALTER ROLE :"app_user" WITH LOGIN PASSWORD :'app_pw';
+
+-- Compte de réplication (droit REPLICATION uniquement)
+SELECT format('CREATE ROLE %I WITH REPLICATION LOGIN', :'repl_user')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'repl_user') \gexec
+ALTER ROLE :"repl_user" WITH REPLICATION LOGIN PASSWORD :'repl_pw';
+
 SELECT 'CREATE DATABASE resultats'
  WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'resultats') \gexec
 SQL
 
+# --- 3. Table et données ----------------------------------------------------
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d resultats \
      -v app_user="${PG_APP_USER}" <<'SQL'
-     SET client_min_messages TO warning;
+SET client_min_messages TO warning;
 CREATE TABLE IF NOT EXISTS resultats (
   matricule  varchar(12)  PRIMARY KEY,
   nom        text         NOT NULL,
@@ -75,8 +54,7 @@ CREATE TABLE IF NOT EXISTS resultats (
   admis      boolean      NOT NULL
 );
 
--- 50 000 candidats, jeu DÉTERMINISTE : identique à chaque reconstruction.
--- N'insère que si la table est vide (idempotence).
+-- 50 000 candidats, jeu DÉTERMINISTE ; n'insère que si la table est vide
 INSERT INTO resultats (matricule, nom, serie, moyenne, admis)
 SELECT 'BF2026' || lpad(g::text, 6, '0'),
        'Candidat ' || g,
