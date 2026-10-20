@@ -25,6 +25,17 @@ config = modele.replace("@@SERVEURS@@", serveurs).replace("@@IP_LB@@", moi["ip"]
 print(config if config.endswith("\n") else config + "\n", end="")
 PY
 
+# --- 1 bis. Réponse du répartiteur quand AUCUN serveur n'est disponible -------
+# Du JSON, comme le reste de l'API : jamais une page HTML brute (scénario V4).
+# Fichier HTTP complet ; HAProxy attend des fins de ligne CRLF.
+install -d -m 755 /etc/haproxy/errors
+ecrire_si_change /etc/haproxy/errors/503-resultats.http root:root 644 < <(printf '%s\r\n' \
+  'HTTP/1.1 503 Service Unavailable' \
+  'Content-Type: application/json; charset=utf-8' \
+  'Cache-Control: no-cache' \
+  'Connection: close' \
+  '' \
+  '{"erreur":"service temporairement indisponible","source":"repartiteur"}') && RECHARGER=1
 # --- 2. Vérifier AVANT d'installer : jamais de configuration invalide en service
 if ! haproxy -c -q -f "$TMP"; then
   echo "ERREUR : configuration HAProxy engendrée invalide :"

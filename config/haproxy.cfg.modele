@@ -21,6 +21,7 @@ defaults
     retries 2
     option  redispatch        # une requête qui échoue est renvoyée vers un autre serveur
     retry-on conn-failure empty-response   # sans risque : uniquement des GET idempotents
+    errorfile 503 /etc/haproxy/errors/503-resultats.http   # réponse JSON si aucun serveur n'est disponible
 
 frontend resultats
     bind *:80
