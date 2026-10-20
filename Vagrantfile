@@ -116,7 +116,10 @@ Vagrant.configure("2") do |config|
       end
 
       m.vm.provision "commun",  type: "shell", path: "scripts/commun.sh",          env: ENV_PROVISION
-      m.vm.provision n["role"], type: "shell", path: "scripts/#{n['role']}.sh",    env: ENV_PROVISION
+      # Le répartiteur est reprovisionné à CHAQUE « vagrant up » : sa configuration
+      # suit ainsi NB_APP sans intervention (R3). Sans risque : lb.sh est idempotent.
+      m.vm.provision n["role"], type: "shell", path: "scripts/#{n['role']}.sh",
+                     env: ENV_PROVISION, run: (n["role"] == "lb" ? "always" : "once")
     end
   end
 end
