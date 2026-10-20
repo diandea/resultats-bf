@@ -32,20 +32,24 @@ _connexion = None   # cache technique par processus — pas un état métier
 
 def executer(sql, params=()):
     """Exécute une requête et renvoie (première ligne, hôte de la base).
-    Lève psycopg.OperationalError si la base est indisponible."""
+    Si la connexion en cache est périmée (base redémarrée, bascule), réessaie
+    UNE fois avec une connexion neuve. Si une connexion neuve échoue, la base
+    est réellement indisponible : on lève l'erreur sans attendre davantage."""
     global _connexion
-    try:
-        if _connexion is None or _connexion.closed:
-            _connexion = psycopg.connect(**PARAMS)
-        with _connexion.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, params)
-            return cur.fetchone(), _connexion.info.host
-    except psycopg.OperationalError:
-        # Connexion rompue (panne, bascule) : on l'abandonne.
-        if _connexion is not None:
-            _connexion.close()
-        _connexion = None
-        raise
+    for _ in range(2):
+        neuve = _connexion is None or _connexion.closed
+        try:
+            if neuve:
+                _connexion = psycopg.connect(**PARAMS)
+            with _connexion.cursor(row_factory=dict_row) as cur:
+                cur.execute(sql, params)
+                return cur.fetchone(), _connexion.info.host
+        except psycopg.OperationalError:
+            if _connexion is not None:
+                _connexion.close()
+            _connexion = None
+            if neuve:
+                raise
 
 
 @app.get("/resultat")
