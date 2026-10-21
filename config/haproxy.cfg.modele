@@ -1,0 +1,42 @@
+# Modèle de configuration HAProxy — RÉSULTATS-BF
+# Les marqueurs @@...@@ sont remplacés par scripts/lb.sh à partir de
+# config/noeuds.yml (source unique de vérité). AUCUNE adresse ne doit être
+# écrite ici : la liste des serveurs est engendrée.
+
+global
+    log /dev/log local0
+    maxconn 4096
+    user haproxy
+    group haproxy
+
+defaults
+    mode    http
+    log     global
+    option  httplog
+    option  dontlognull
+    timeout connect 1s        # réseau privé local : 1 s suffit largement
+    timeout client  30s
+    timeout server  15s
+    timeout check   1s
+    retries 2
+    option  redispatch        # une requête qui échoue est renvoyée vers un autre serveur
+    retry-on conn-failure empty-response   # sans risque : uniquement des GET idempotents
+    errorfile 503 /etc/haproxy/errors/503-resultats.http   # réponse JSON si aucun serveur n'est disponible
+
+frontend resultats
+    bind *:80
+    default_backend applicatifs
+
+backend applicatifs
+    balance roundrobin
+    option httpchk GET /sante
+    http-check expect status 200
+    # Sonde chaque seconde ; écarté après 2 échecs (~2 s), réintégré après 2 succès
+    default-server inter 1s fall 2 rise 2
+@@SERVEURS@@
+
+listen statistiques
+    bind @@IP_LB@@:8404       # réseau privé uniquement, aucun port redirigé (R8)
+    stats enable
+    stats uri /stats
+    stats refresh 2s

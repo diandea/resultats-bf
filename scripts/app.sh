@@ -65,4 +65,4 @@ for i in $(seq 1 15); do
   sleep 1
 done
 CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/sante || true)
-echo "[app] $(hostname) — service actif sur :3000 — /sante = ${CODE}"S
+echo "[app] $(hostname) — service actif sur :3000 — /sante = ${CODE}"
