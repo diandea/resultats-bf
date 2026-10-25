@@ -1,0 +1,4 @@
+[  0.17 s] Début de la procédure de bascule
+[  0.35 s] 1/5 Vérification que bdd1 est bien hors service
+[ 17.99 s] 2/5 Vérification que bdd2 est une réplique
+[ 31.98 s] bdd2 est déjà primaire : rien à faire.

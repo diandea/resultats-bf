@@ -119,7 +119,12 @@ Vagrant.configure("2") do |config|
       # Le répartiteur est reprovisionné à CHAQUE « vagrant up » : sa configuration
       # suit ainsi NB_APP sans intervention (R3). Sans risque : lb.sh est idempotent.
       m.vm.provision n["role"], type: "shell", path: "scripts/#{n['role']}.sh",
-                     env: ENV_PROVISION, run: (n["role"] == "lb" ? "always" : "once")
+	  
+	  # Rejoués à CHAQUE « vagrant up » (scripts idempotents) :
+      #  - lb       : sa configuration suit NB_APP (R3)
+      #  - bdd, replique : PostgreSQL ne démarre pas seul au boot ; le script
+      #    décide d'abord du rôle du nœud (évite deux primaires après une bascule)
+                     env: ENV_PROVISION, run: (%w[lb bdd replique].include?(n["role"]) ? "always" : "once")
     end
   end
 end

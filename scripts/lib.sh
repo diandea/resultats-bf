@@ -89,3 +89,17 @@ EOF
 
   return $change
 }
+# postgresql_demarrage_manuel : PostgreSQL ne démarre PAS seul au boot de la VM.
+# Le provisionnement (rejoué à chaque vagrant up) le démarre APRÈS avoir décidé
+# du rôle du nœud : un ancien primaire ne peut donc pas redémarrer en primaire.
+postgresql_demarrage_manuel() {
+  echo "manual" | ecrire_si_change /etc/postgresql/16/main/start.conf postgres:postgres 644 || true
+}
+
+# est_primaire HOTE : vrai si PostgreSQL répond sur HOTE et n'est PAS une réplique
+est_primaire() {
+  local r
+  r=$(PGCONNECT_TIMEOUT=2 PGPASSWORD="$PG_APP_PASSWORD" \
+      psql -h "$1" -U "$PG_APP_USER" -d resultats -tAc "SELECT NOT pg_is_in_recovery()" 2>/dev/null) || return 1
+  [ "$r" = "t" ]
+}
