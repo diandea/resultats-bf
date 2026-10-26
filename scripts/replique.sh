@@ -14,7 +14,7 @@ echo "[replique] $(hostname) — réplique de bdd1 (${IP_PRIMAIRE})"
 
 # --- 1. Installation et configuration (identique au primaire) ---------------
 installer_paquets "postgresql-${PG_VER}"
-
+postgresql_demarrage_manuel
 CONFIG_CHANGEE=0
 ecrire_config_postgresql && CONFIG_CHANGEE=1
 
@@ -52,4 +52,5 @@ attendre_postgresql
 # --- 3. Contrôle ------------------------------------------------------------
 EN_REPLIQUE=$(sudo -u postgres psql -tAc "SELECT pg_is_in_recovery()")
 NB=$(sudo -u postgres psql -tA -d resultats -c "SELECT count(*) FROM resultats")
-echo "[replique] $(hostname) — en mode réplique : ${EN_REPLIQUE} — ${NB} lignes — OK"
+if [ "$EN_REPLIQUE" = "t" ]; then ROLE="réplique de bdd1"; else ROLE="PRIMAIRE (promue par bascule)"; fi
+echo "[replique] $(hostname) — ${ROLE} — ${NB} lignes — OK"
