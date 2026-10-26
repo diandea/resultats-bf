@@ -110,7 +110,7 @@ SQL
 
 touch "$INIT"
 mkdir -p "$(dirname "$ETAT")"
-[ "$(tr -d '\r\n ' < "$ETAT" 2>/dev/null)" = "bdd1" ] || echo "bdd1" > "$ETAT"
+[ "$(cat  "$ETAT"  2>/dev/null | tr -d  '\r\n ')" = "bdd1" ] || echo "bdd1" > "$ETAT"
 
 NB=$(sudo -u postgres psql -tA -d resultats -c "SELECT count(*) FROM resultats")
 echo "[bdd] $(hostname) — PRIMAIRE — table resultats : ${NB} lignes — OK"
