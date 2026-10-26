@@ -1,0 +1,9 @@
+Campagne V6 (brutal) du 2026-10-26 18:20 — IP virtuelle 192.168.59.5
+Commande de panne lancée à : 18:19:42.933
+Requêtes envoyées : 57
+  code 000 : 3
+  code 200 : 54
+Début de l interruption : 18:19:49.214
+Reprise du service      : 18:19:53.448
+Durée d interruption    : 4.2 s
+Interfaces de lb2 après la panne : eth1             UP             192.168.59.12/24 192.168.59.5/24 

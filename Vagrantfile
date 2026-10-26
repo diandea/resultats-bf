@@ -56,6 +56,8 @@ end
 GROUPE  = param("GROUPE", "4").to_i
 NB_APP  = param("NB_APP", "2").to_i
 PORT_HOTE = param("PORT_HOTE", "8080").to_i
+NB_LB     = param("NB_LB", "1").to_i
+abort "ERREUR : NB_LB doit valoir 1 (socle) ou 2 (extension E1)" unless [1, 2].include?(NB_LB)
 abort "ERREUR : GROUPE doit être compris entre 1 et 8" unless (1..8).include?(GROUPE)
 abort "ERREUR : NB_APP doit être >= 2 (résilience)"    if NB_APP < 2
 abort "ERREUR : NB_APP doit être <= 9 (plage .21 à .29)" if NB_APP > 9
@@ -75,13 +77,17 @@ NOEUDS << { "nom" => "bdd2", "ip" => "#{RESEAU}.32", "mem" => 768, "role" => "re
 (1..NB_APP).each do |i|
   NOEUDS << { "nom" => "app#{i}", "ip" => "#{RESEAU}.#{20 + i}", "mem" => 512, "role" => "app" }
 end
-NOEUDS << { "nom" => "lb1", "ip" => "#{RESEAU}.11", "mem" => 512, "role" => "lb" }
+# Répartiteurs : lb1 (+ lb2 avec l'extension E1). Toujours déclarés EN DERNIER.
+(1..NB_LB).each do |i|
+  NOEUDS << { "nom" => "lb#{i}", "ip" => "#{RESEAU}.#{10 + i}", "mem" => 512, "role" => "lb" }
+end
+VIP = "#{RESEAU}.5"   # adresse virtuelle du service (portée par le répartiteur maître)
 
 # Écriture de config/noeuds.yml — mode binaire ("wb") pour forcer des fins
 # de ligne LF, même quand Vagrant tourne sous Windows.
 FileUtils.mkdir_p(File.join(RACINE, "config"))
-inventaire = { "groupe" => GROUPE, "reseau" => RESEAU,
-               "nb_app" => NB_APP, "noeuds" => NOEUDS }
+inventaire = { "groupe" => GROUPE, "reseau" => RESEAU, "vip" => VIP,
+               "nb_app" => NB_APP, "nb_lb" => NB_LB, "noeuds" => NOEUDS }
 File.write(File.join(RACINE, "config", "noeuds.yml"), inventaire.to_yaml, mode: "wb")
 
 # Variables transmises aux scripts de provisionnement (jamais écrites dans le dépôt)
@@ -103,7 +109,7 @@ Vagrant.configure("2") do |config|
       m.vm.network "private_network", ip: n["ip"]
 
       # R8 : seul le répartiteur expose un port vers l'hôte
-      if n["role"] == "lb"
+            if n["nom"] == "lb1"
                m.vm.network "forwarded_port", guest: 80, host: PORT_HOTE,
                      host_ip: "127.0.0.1", auto_correct: false
       end

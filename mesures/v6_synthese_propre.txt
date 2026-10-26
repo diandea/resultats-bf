@@ -1,0 +1,6 @@
+Campagne V6 (propre) du 2026-10-26 17:54 — IP virtuelle 192.168.59.5
+Commande de panne lancée à : 17:52:32.017
+Requêtes envoyées : 212
+  code 200 : 212
+Aucune interruption observée : la reprise a été transparente pour le client
+Interfaces de lb2 après la panne : eth1             UP             192.168.59.12/24 192.168.59.5/24 
