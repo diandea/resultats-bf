@@ -27,7 +27,7 @@ vagrant status lb2 | grep -q running || { echo "ARRÊT : lb2 n'est pas démarré
 # --- 1. Sonde client sur l'IP virtuelle, en arrière-plan
 : > "$DISPO"
 ( while [ ! -f "$STOP" ]; do
-    printf '%s %s\n' "$(date +%H:%M:%S.%3N)" "$(curl --noproxy '*' -s -m 5 -w ' %{http_code}' "$URL" | tr -d '\n')"
+    printf '%s %s\n' "$(date +%H:%M:%S.%3N)" "$(curl --noproxy '*' -s -m 1 -w ' %{http_code}' "$URL" | tr -d '\n')"
     sleep 0.25
   done ) >> "$DISPO" &
 SONDE=$!
