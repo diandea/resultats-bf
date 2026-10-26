@@ -85,7 +85,7 @@ global_defs {{
 
 # HAProxy arrêté sur ce nœud => priorité abaissée de 60 : le pair prend l'IP virtuelle
 vrrp_script haproxy_vivant {{
-    script "/usr/bin/pidof haproxy"
+    script "/usr/bin/pgrep -x haproxy"
     interval 1
     fall 2
     rise 2
@@ -114,6 +114,14 @@ PY
 if ! keepalived -t -f "$KTMP" > /dev/null 2>&1; then
   echo "ERREUR : configuration keepalived engendrée invalide :"
   keepalived -t -f "$KTMP" || true
+  exit 1
+fi
+
+# La sonde de keepalived doit RÉUSSIR quand HAProxy tourne. Sinon, la priorité du
+# nœud est abaissée en permanence et la reprise sur panne de HAProxy ne fonctionne
+# pas, sans aucun symptôme visible en fonctionnement normal.
+if ! /usr/bin/pgrep -x haproxy > /dev/null; then
+  echo "ERREUR : la sonde de keepalived (pgrep -x haproxy) échoue alors que HAProxy tourne"
   exit 1
 fi
 
