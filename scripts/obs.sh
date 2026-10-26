@@ -120,7 +120,13 @@ for i in $(seq 1 60); do
   sleep 2
 done
 curl -sf -o /dev/null http://127.0.0.1:3000/api/health || { echo "ERREUR : Grafana ne répond pas"; exit 1; }
-sleep 4   # laisser Prometheus effectuer un premier passage
+for i in $(seq 1 15); do              # attendre que Prometheus ait rechargé ses cibles
+  N=$(curl -s http://127.0.0.1:9090/api/v1/targets \
+      | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["activeTargets"]))' 2>/dev/null || echo 0)
+  [ "$N" -gt 0 ] && break
+  sleep 1
+done
+sleep 3                               # puis un passage de collecte (intervalle de 2 s)
 curl -s http://127.0.0.1:9090/api/v1/targets | python3 -c '
 import json, sys
 c = json.load(sys.stdin)["data"]["activeTargets"]
