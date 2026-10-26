@@ -1,0 +1,8 @@
+Vérification d'idempotence (R2) du 2026-10-26 22:16
+VM : bdd1 bdd2 app1 app2 obs lb1 lb2 
+Fichiers de configuration surveillés : 56
+Rejeu 1 : réussi — 0 action(s) de modification signalée(s)
+Rejeu 2 : réussi — 0 action(s) de modification signalée(s)
+Empreintes initiales / après rejeu 1 : IDENTIQUES
+Empreintes après rejeu 1 / après rejeu 2 : IDENTIQUES
+VERDICT : R2 VÉRIFIÉE
