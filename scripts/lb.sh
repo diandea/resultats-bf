@@ -124,8 +124,12 @@ if ecrire_si_change /etc/keepalived/keepalived.conf root:root 640 < "$KTMP"; the
 else
   systemctl start keepalived
 fi
-sleep 3
-if ip -4 addr show eth1 | grep -q "$(python3 -c 'import yaml; print(yaml.safe_load(open("/vagrant/config/noeuds.yml"))["vip"])')/"; then
+VIP=$(python3 -c 'import yaml; print(yaml.safe_load(open("/vagrant/config/noeuds.yml"))["vip"])')
+for i in $(seq 1 8); do                      # élection VRRP : ~3,6 s sans annonce
+  ip -4 addr show eth1 | grep -q "${VIP}/" && break
+  sleep 1
+done
+if ip -4 addr show eth1 | grep -q "${VIP}/"; then
   echo "[lb] $(hostname) — keepalived actif — PORTE l'IP virtuelle (maître)"
 else
   echo "[lb] $(hostname) — keepalived actif — en secours (ne porte pas l'IP virtuelle)"
