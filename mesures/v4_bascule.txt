@@ -1,4 +1,15 @@
-[  0.17 s] Début de la procédure de bascule
-[  0.35 s] 1/5 Vérification que bdd1 est bien hors service
-[ 17.99 s] 2/5 Vérification que bdd2 est une réplique
-[ 31.98 s] bdd2 est déjà primaire : rien à faire.
+[  0.21 s] Début de la procédure de bascule
+[  0.37 s] 1-3/5 Vérifications et promotion de bdd2
+      [bdd2 + 0.12 s] 1/3 bdd1 (192.168.59.31) est-elle hors service ?
+      [bdd2 + 2.38 s]     bdd1 ne répond pas
+      [bdd2 + 2.42 s] 2/3 bdd2 est-elle une réplique ?
+      [bdd2 + 2.67 s]     oui
+      [bdd2 + 2.71 s] 3/3 Promotion (pg_promote)
+      [bdd2 + 5.50 s]     bdd2 est PRIMAIRE
+[ 20.94 s]     bdd2 est désormais PRIMAIRE (lecture et écriture)
+[ 21.03 s] 4/5 Enregistrement de l'état : primaire = bdd2
+[ 21.18 s] 5/5 Attente du rétablissement du service via le répartiteur (port 18080)
+[ 32.68 s] SERVICE RÉTABLI : {"base":"192.168.59.32","serveur":"app1","statut":"ok"}
+
+Réintégrer bdd1 (en réplique de bdd2)          : vagrant up bdd1
+Revenir à la situation nominale (bdd1 primaire) : vagrant destroy -f && vagrant up
