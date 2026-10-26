@@ -37,6 +37,8 @@ backend applicatifs
 
 listen statistiques
     bind @@IP_LB@@:8404       # réseau privé uniquement, aucun port redirigé (R8)
+    http-request use-service prometheus-exporter if { path /metrics }
     stats enable
     stats uri /stats
     stats refresh 2s
+    
