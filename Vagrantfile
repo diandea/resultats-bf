@@ -61,6 +61,13 @@ abort "ERREUR : NB_LB doit valoir 1 (socle) ou 2 (extension E1)" unless [1, 2].i
 abort "ERREUR : GROUPE doit être compris entre 1 et 8" unless (1..8).include?(GROUPE)
 abort "ERREUR : NB_APP doit être >= 2 (résilience)"    if NB_APP < 2
 abort "ERREUR : NB_APP doit être <= 9 (plage .21 à .29)" if NB_APP > 9
+OBS       = param("OBS", "0").to_i
+abort "ERREUR : OBS doit valoir 0 (socle) ou 1 (extension E2)" unless [0, 1].include?(OBS)
+if OBS == 1
+  gp = param("GRAFANA_ADMIN_PASSWORD")
+  abort "ERREUR : GRAFANA_ADMIN_PASSWORD manquant ou 'changez-moi' dans .env (requis avec OBS=1)" \
+    if gp.nil? || gp.empty? || gp == "changez-moi"
+end
 
 RESEAU  = "192.168.#{55 + GROUPE}"
 BOITE   = "bento/ubuntu-24.04"
@@ -77,6 +84,9 @@ NOEUDS << { "nom" => "bdd2", "ip" => "#{RESEAU}.32", "mem" => 768, "role" => "re
 (1..NB_APP).each do |i|
   NOEUDS << { "nom" => "app#{i}", "ip" => "#{RESEAU}.#{20 + i}", "mem" => 512, "role" => "app" }
 end
+# Supervision (extension E2) : déclarée avant les répartiteurs
+NOEUDS << { "nom" => "obs", "ip" => "#{RESEAU}.41", "mem" => 768, "role" => "obs" } if OBS == 1
+
 # Répartiteurs : lb1 (+ lb2 avec l'extension E1). Toujours déclarés EN DERNIER.
 (1..NB_LB).each do |i|
   NOEUDS << { "nom" => "lb#{i}", "ip" => "#{RESEAU}.#{10 + i}", "mem" => 512, "role" => "lb" }
@@ -93,6 +103,7 @@ File.write(File.join(RACINE, "config", "noeuds.yml"), inventaire.to_yaml, mode: 
 # Variables transmises aux scripts de provisionnement (jamais écrites dans le dépôt)
 ENV_PROVISION = { "GROUPE" => GROUPE.to_s, "RESEAU" => RESEAU, "NB_APP" => NB_APP.to_s }
 SECRETS.each { |s| ENV_PROVISION[s] = param(s) }
+ENV_PROVISION["GRAFANA_ADMIN_PASSWORD"] = param("GRAFANA_ADMIN_PASSWORD", "")
 
 # ---------------------------------------------------------------------
 # 4. Définition des machines virtuelles
@@ -130,7 +141,7 @@ Vagrant.configure("2") do |config|
       #  - lb       : sa configuration suit NB_APP (R3)
       #  - bdd, replique : PostgreSQL ne démarre pas seul au boot ; le script
       #    décide d'abord du rôle du nœud (évite deux primaires après une bascule)
-                     env: ENV_PROVISION, run: (%w[lb bdd replique].include?(n["role"]) ? "always" : "once")
+                     env: ENV_PROVISION, run: (%w[lb bdd replique obs].include?(n["role"]) ? "always" : "once")
     end
   end
 end

@@ -17,5 +17,5 @@ if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -name '*_InRelease' -mmin -60 2>/
 fi
 
 # Paquets communs, installés en un seul appel
-apt-get install -y -qq --no-install-recommends curl python3-yaml > /dev/null
+apt-get install -y -qq --no-install-recommends curl python3-yaml prometheus-node-exporter > /dev/null
 echo "[commun] $(hostname) — OK"
