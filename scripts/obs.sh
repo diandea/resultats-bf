@@ -19,8 +19,10 @@ if ! dpkg -s grafana > /dev/null 2>&1; then
   echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
     > /etc/apt/sources.list.d/grafana.list
   apt-get update -qq
+  cache_apt_restaurer
   DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 \
     apt-get install -y -qq "grafana=${GRAFANA_VERSION}" > /dev/null
+	cache_apt_sauver
 fi
 
 # --- 3. Configuration de Prometheus ENGENDRÉE depuis la source de vérité ----------

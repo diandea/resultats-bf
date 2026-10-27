@@ -1,6 +1,7 @@
 .vagrant/
 .env
 .etat/
+.cache/
 *.log
 __pycache__/
 config/noeuds.yml
