@@ -20,6 +20,14 @@ ecrire_si_change() {
 }
 
 # installer_paquets PAQUET...  (n'appelle apt que s'il manque quelque chose)
+# Cache de paquets partagé entre les VM (dossier du projet, sur l'hôte) :
+# un paquet téléchargé par une VM n'est plus retéléchargé par les autres,
+# ni lors d'une reconstruction complète (« ne téléchargez pas la même chose quatre fois »).
+CACHE_APT=/vagrant/.cache/apt
+cache_apt_restaurer() { mkdir -p "$CACHE_APT"; cp -n "$CACHE_APT"/*.deb /var/cache/apt/archives/ 2>/dev/null || true; }
+cache_apt_sauver()    { mkdir -p "$CACHE_APT"; cp -n /var/cache/apt/archives/*.deb "$CACHE_APT"/ 2>/dev/null || true; }
+
+# installer_paquets PAQUET...  (n'appelle apt que s'il manque quelque chose)
 installer_paquets() {
   local manquants=()
   for p in "$@"; do
@@ -27,8 +35,10 @@ installer_paquets() {
   done
   if [ ${#manquants[@]} -gt 0 ]; then
     echo "   installation : ${manquants[*]}"
+    cache_apt_restaurer
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 \
       apt-get install -y -qq --no-install-recommends "${manquants[@]}" > /dev/null
+    cache_apt_sauver
   fi
 }
 

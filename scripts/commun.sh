@@ -3,7 +3,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_SUSPEND=1
-
+source /vagrant/scripts/lib.sh
 echo "[commun] $(hostname) — groupe ${GROUPE}, réseau ${RESEAU}.0/24"
 
 # Fuseau horaire : ne change que si nécessaire
@@ -17,5 +17,5 @@ if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -name '*_InRelease' -mmin -60 2>/
 fi
 
 # Paquets communs, installés en un seul appel
-apt-get install -y -qq --no-install-recommends curl python3-yaml prometheus-node-exporter > /dev/null
+installer_paquets curl python3-yaml prometheus-node-exporter.;
 echo "[commun] $(hostname) — OK"
