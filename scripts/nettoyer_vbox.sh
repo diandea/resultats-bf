@@ -17,9 +17,12 @@ echo "== 1/4 vagrant destroy -f"
 vagrant destroy -f
 
 echo "== 2/4 VM résiduelles enregistrées dans VirtualBox"
-"$VBOX" list vms | grep -oE "\"(temp_clone_|${MOTIF})[^\"]*\"" | tr -d '"' | while read -r vm; do
+# « || true » : quand il n'y a rien à supprimer, grep renvoie 1 ; avec pipefail,
+# le script s'arrêterait silencieusement ici.
+"$VBOX" list vms | { grep -oE "\"(temp_clone_|${MOTIF})[^\"]*\"" || true; } | tr -d '"' | while read -r vm; do
   echo "   suppression de $vm"; "$VBOX" unregistervm "$vm" --delete || true
 done
+echo "   (terminé)"
 
 echo "== 3/4 Dossiers résiduels dans ${DOSSIER_VMS}"
 rm -rf "${DOSSIER_VMS}"/${MOTIF}* "${DOSSIER_VMS}"/temp_clone_*
