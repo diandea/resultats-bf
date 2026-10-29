@@ -11,7 +11,7 @@ RÉSULTATS-BF publie les résultats d'un examen national : un candidat saisit so
 | Salif | Ingénieur données |
 | Sanata | Ingénieure essais et observabilité |
 
-> **État au 27 octobre 2026.** Les huit exigences (R1 à R8) et les deux extensions (E1 : répartiteur redondant, E2 : supervision) sont réalisées et fusionnées dans `main`. Le cache de paquets partagé est intégré (PR #10). En cours d'intégration : les outils d'essai, dont le script de preuve globale d'idempotence, et la campagne de mesures finale (notamment V3). Voir [État d'avancement](#état-davancement).
+> **État au 29 octobre 2026.** Les huit exigences (R1 à R8) et les deux extensions (E1 : répartiteur redondant, E2 : supervision) sont réalisées et fusionnées dans `main`, avec le cache de paquets partagé (PR #10). La preuve globale d'idempotence conclut « R2 VÉRIFIÉE » sur 7 VM et 56 fichiers de configuration (`mesures/r2_idempotence.txt`). Reste la campagne de mesures finale, notamment V3. Voir [État d'avancement](#état-davancement).
 
 ---
 
@@ -107,6 +107,7 @@ cd resultats-bf
 
 cp .env.exemple .env
 notepad .env          # remplacer chaque « changez-moi » par un vrai mot de passe
+                      # pour l'extension E2, ajouter aussi : OBS=1 et GRAFANA_ADMIN_PASSWORD=...
 
 vagrant box add bento/ubuntu-24.04 --box-version 202510.26.0 --provider virtualbox
 time vagrant up
@@ -121,7 +122,7 @@ vagrant status                                   # toutes les VM « running »
 curl -s http://127.0.0.1:8080/sante; echo        # remplacer 8080 par PORT_HOTE si besoin
 ```
 
-Pour tout supprimer : `vagrant destroy -f`.
+Pour tout supprimer : `vagrant destroy -f`. Avant une reconstruction depuis zéro, fermer l'interface VirtualBox et lancer plutôt `bash scripts/nettoyer_vbox.sh`. Ce script détruit les VM et supprime aussi les dossiers résiduels que VirtualBox laisse parfois sur le disque. Il ne touche qu'aux VM `rbf-g<N>-*` et `temp_clone_*` ; les autres VM du poste sont préservées.
 
 ---
 
@@ -133,8 +134,8 @@ Tous les paramètres sont dans `.env` (jamais versionné). `.env.exemple`, versi
 |---|---|---|
 | `GROUPE` | Numéro de groupe, préfixe des noms de VM (`rbf-g4-…`) | `4` |
 | `NB_APP` | Nombre de serveurs applicatifs (R3) | `2` |
-| `NB_LB` | `1` = un répartiteur ; `2` = extension E1 (lb2 + IP virtuelle) | `1` |
-| `OBS` | `0` = sans supervision ; `1` = extension E2 (VM obs) | `0` |
+| `NB_LB` | `1` = un répartiteur ; `2` = extension E1 (lb2 + IP virtuelle) | `1` (`2` dans `.env.exemple`) |
+| `OBS` | `0` = sans supervision ; `1` = extension E2 (VM obs) ; absent de `.env.exemple`, à ajouter | `0` |
 | `PORT_HOTE` | Port de l'hôte redirigé vers lb1 | `8080` |
 | `PG_SUPERUSER_PASSWORD` | Mot de passe du superutilisateur PostgreSQL | à définir |
 | `PG_APP_USER`, `PG_APP_PASSWORD` | Rôle en lecture seule de l'application | `resultats`, à définir |
@@ -142,7 +143,7 @@ Tous les paramètres sont dans `.env` (jamais versionné). `.env.exemple`, versi
 | `VRRP_PASSWORD` | Secret VRRP partagé par lb1 et lb2 (8 caractères au plus) | à définir |
 | `GRAFANA_ADMIN_PASSWORD` | Administrateur Grafana (requis avec `OBS=1`) ; lettres et chiffres | à définir |
 
-Configuration complète utilisée pour la démonstration : `NB_APP=2`, `NB_LB=2`, `OBS=1`, soit 7 VM. Chaque VM demande environ 650 Mo de RAM.
+Configuration complète utilisée pour la démonstration : `NB_APP=2`, `NB_LB=2`, `OBS=1`, soit 7 VM et environ 4,3 Go de RAM réservés aux VM : 768 Mo pour bdd1, bdd2 et obs, 512 Mo pour chaque serveur applicatif et chaque répartiteur, 1 processeur virtuel par VM.
 
 **Changer le nombre de serveurs applicatifs**, par exemple de 2 à 4 : mettre `NB_APP=4` dans `.env`, puis :
 
@@ -221,12 +222,12 @@ bash scripts/mesure_v4.sh
 
 Le script vérifie l'état nominal, lance une sonde client, arrête bdd1, exécute la bascule (`scripts/bascule.sh` : contrôle de bdd1, promotion de bdd2, enregistrement dans `.etat/primaire`) et écrit la synthèse dans `mesures/v4_synthese.txt`.
 
-Après la bascule, bdd2 est le primaire. `vagrant up bdd1`, avec bdd2 en marche, reconstruit bdd1 comme réplique de bdd2. Pour retrouver bdd1 primaire, il faut reconstruire la plateforme.
+Après la bascule, bdd2 est le primaire. `vagrant up bdd1`, avec bdd2 en marche, reconstruit bdd1 comme réplique de bdd2. Pour retrouver bdd1 primaire, il faut reconstruire la plateforme. La procédure complète, avec ses vérifications, est décrite dans [`docs/procedure-bascule.md`](docs/procedure-bascule.md).
 
 **V5 — Reconstruction complète**
 
 ```bash
-vagrant destroy -f
+bash scripts/nettoyer_vbox.sh
 time vagrant up
 ```
 
@@ -243,6 +244,14 @@ vagrant up lb1
 
 L'IP virtuelle passe sur lb2, puis revient sur lb1 à son retour.
 
+**R2 — Preuve globale d'idempotence** (plateforme démarrée, environ 10 minutes)
+
+```bash
+bash scripts/verifier_idempotence.sh
+```
+
+Le script rejoue deux fois `vagrant provision` sur toutes les VM démarrées. Il compare les empreintes md5 de tous les fichiers de configuration gérés et vérifie dans les journaux qu'aucun rejeu n'a écrit de fichier, installé de paquet ni redémarré de service. Le rapport est écrit dans `mesures/r2_idempotence.txt` et doit conclure « R2 VÉRIFIÉE ». `.pgpass` n'y figure que par son empreinte : aucun mot de passe n'apparaît.
+
 ---
 
 ## Organisation du dépôt
@@ -253,7 +262,7 @@ Vagrantfile                  Définition des VM, lecture de .env, garde-fous, g�
 .editorconfig, .gitattributes  Fins de ligne LF imposées
 app/app.py                   Application Flask
 config/haproxy.cfg.modele    Modèle de configuration HAProxy
-config/grafana/              Tableau de bord et provisionnement Grafana
+config/grafana-resultats.json  Tableau de bord Grafana (provisionné par obs.sh)
 scripts/lib.sh               Fonctions communes (ecrire_si_change, installer_paquets…)
 scripts/commun.sh            Socle de toutes les VM (paquets de base, node_exporter)
 scripts/bdd.sh               Primaire PostgreSQL, données, décision de rôle au démarrage
@@ -265,13 +274,17 @@ scripts/bascule.sh           Procédure de bascule vers bdd2 (R6), lancée depui
 scripts/promouvoir.sh        Promotion de bdd2 en une seule connexion SSH
 scripts/mesure_v4.sh         Campagne V4 automatisée
 scripts/mesure_v6.sh         Campagne V6 automatisée
-scripts/test_crlf.sh         Contrôle des fins de ligne
-mesures/                     Relevés bruts des essais
+scripts/nettoyer_vbox.sh     Nettoyage des restes VirtualBox avant une reconstruction (hôte)
+scripts/verifier_idempotence.sh  Preuve globale de R2 : double rejeu et comparaison d'empreintes (hôte)
+docs/procedure-bascule.md    Procédure d'exploitation de la bascule de la base
+docs/captures/               Captures d'écran Grafana (tableau de bord, charge, panne de app1)
+mesures/                     Relevés bruts des essais (V1, V2, V4, V6, R2)
+README.md, JOURNAL.md        Présent document et journal de bord
 ```
 
 Fichiers non versionnés : `.env`, `.vagrant/`, `config/noeuds.yml` (engendré), `.etat/` (état de bascule), `.cache/` (cache de paquets apt).
 
-En cours d'intégration : `scripts/nettoyer_vbox.sh` (nettoyage des restes VirtualBox) et `scripts/verifier_idempotence.sh` (preuve globale de R2).
+Le contrôle des fins de ligne est fait par le `Vagrantfile` lui-même : il refuse de démarrer si un script de `scripts/` contient des fins de ligne CRLF.
 
 ---
 
@@ -282,7 +295,7 @@ En cours d'intégration : `scripts/nettoyer_vbox.sh` (nettoyage des restes Virtu
 | Exigence | État | Preuve ou mesure |
 |---|---|---|
 | R1 Reconstruction intégrale | Réalisée | Réussie sur les quatre postes ; de 6 min 42 s à 14 min 09 s selon le poste |
-| R2 Idempotence | Réalisée ; preuve globale en cours | Empreintes et services inchangés après rejeu, rôle par rôle |
+| R2 Idempotence | Réalisée et vérifiée | Double rejeu sur 7 VM : 56 fichiers aux empreintes identiques, 0 action de modification (`mesures/r2_idempotence.txt`) |
 | R3 Nombre de serveurs paramétrable | Réalisée | `NB_APP=4 vagrant up` en 4 min 51 s ; répartition 10/10/10/10 |
 | R4 Sonde de santé | Réalisée | Serveur écarté en environ 1,2 s ; 0 requête perdue sur 75 |
 | R5 Réplication en flux | Réalisée | Délai de rejeu de 3,6 ms |
@@ -320,14 +333,12 @@ Les chiffres viennent des postes de l'équipe ; ils seront remesurés sur le pos
 | `ab.exe` ne démarre pas | DLL manquantes | Copier tout le dossier `Apache24\bin` |
 | Erreur de redirection de port au démarrage de lb1 | Port pris ou réservé par Windows | `netsh interface ipv4 show excludedportrange protocol=tcp`, puis changer `PORT_HOTE` |
 | Le `Vagrantfile` signale des fins de ligne CRLF | Fichier enregistré au format Windows | Le réenregistrer en LF (VS Code : en bas à droite) |
-| `VERR_ALREADY_EXISTS` à la création d'une VM | Dossier résiduel dans `VirtualBox VMs` après un `destroy` | Fermer VirtualBox, supprimer les dossiers `rbf-g4-*` et `temp_clone_*` (ou `bash scripts/nettoyer_vbox.sh` une fois intégré) |
+| `VERR_ALREADY_EXISTS` à la création d'une VM | Dossier résiduel dans `VirtualBox VMs` après un `destroy` | Fermer l'interface VirtualBox, puis `bash scripts/nettoyer_vbox.sh` |
 | `VERR_INTNET_FLT_IF_NOT_FOUND` | Carte réseau hôte VirtualBox non attachée | Redémarrer le poste, relancer `vagrant up` |
 | « Machine already provisioned » après un `up` interrompu | Le provisionnement n'a pas été rejoué | `vagrant provision <vm>` |
 | bdd2 en échec au premier démarrage | bdd1 n'était pas démarrée | Démarrer bdd1, puis `vagrant provision bdd2` |
 | bdd1 reste arrêtée après une bascule | Protection contre deux primaires : bdd2 promue mais injoignable | Démarrer bdd2, puis `vagrant up bdd1` (reconstruite en réplique) |
 | VM figée après une mise en veille, ou en pause | Veille Windows ou disque plein | Désactiver la veille, libérer de l'espace, `vagrant reload <vm>` |
-| Message « 0 joignable(s) sur 0 » pendant le provisionnement de obs | Prometheus n'a pas fini de recharger ses cibles | Sans conséquence ; `vagrant provision obs` affiche le bon total |
-
 ---
 
 ## Méthode de travail
