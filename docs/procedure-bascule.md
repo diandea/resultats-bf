@@ -3,7 +3,7 @@
 ## Quand l'appliquer
 bdd1 (primaire) est hors service : `/sante` renvoie 503 en JSON sur tous les serveurs.
 
-## Bascule (environ [X] s, voir mesures/v4_bascule.txt)
+## Bascule (environ 32,7 s, voir mesures/v4_bascule.txt)
     bash scripts/bascule.sh
 La procédure refuse de s'exécuter si bdd1 répond encore (protection contre deux primaires).
 Aucune intervention sur les serveurs applicatifs ni sur le répartiteur : les applications
